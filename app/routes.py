@@ -7,6 +7,7 @@ from datetime import datetime
 import sys
 import os
 from pathlib import Path
+from functools import wraps
 # Add these imports at the top of your routes.py file
 import os
 from werkzeug.utils import secure_filename
@@ -15,6 +16,12 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import logging
+from flask import render_template, redirect, url_for, flash, request, jsonify
+from flask_login import login_user, logout_user, login_required, current_user
+from app.models.user import User
+from forms import LoginForm, RegistrationForm, ChangePasswordForm, ProfileForm, AdminUserForm
+from werkzeug.security import generate_password_hash
+import sqlite3
 main_bp = Blueprint('main', __name__)
 
 # Set up logging
@@ -46,13 +53,237 @@ ALLOWED_EXTENSIONS = {'csv'}
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+def role_required(role):
+    """Decorator to require specific user role"""
+    def decorator(f):
+        @wraps(f)
+        @login_required
+        def decorated_function(*args, **kwargs):
+            if role == 'admin' and not current_user.is_admin():
+                flash('Access denied. Admin privileges required.', 'error')
+                return redirect(url_for('main.index'))
+            elif role == 'analyst' and not current_user.is_analyst():
+                flash('Access denied. Analyst privileges required.', 'error')
+                return redirect(url_for('main.index'))
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+# Authentication Routes
+@main_bp.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+    
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.get_by_username(form.username.data)
+        
+        if user and user.check_password(form.password.data):
+            login_user(user, remember=form.remember_me.data)
+            flash(f'Welcome back, {user.username}! Role: {user.role.title()}', 'success')
+            
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            return redirect(url_for('main.index'))
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('auth/login.html', form=form)
+
+@main_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    """Registration page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('main.index'))
+    
+    form = RegistrationForm()
+    if form.validate_on_submit():
+        user = User.create_user(
+            username=form.username.data,
+            email=form.email.data,
+            password=form.password.data,
+            role=form.role.data
+        )
+        
+        if user:
+            flash(f'Registration successful! Welcome, {user.username}!', 'success')
+            login_user(user)
+            return redirect(url_for('main.index'))
+        else:
+            flash('Registration failed. Username or email may already be taken.', 'error')
+    
+    return render_template('auth/register.html', form=form)
+
+@main_bp.route('/logout')
+@login_required
+def logout():
+    """Logout"""
+    username = current_user.username
+    logout_user()
+    flash(f'Goodbye, {username}!', 'info')
+    return redirect(url_for('main.login'))
+
+@main_bp.route('/profile')
+@login_required
+def profile():
+    if isinstance(current_user.created_at, str):
+        try:
+            current_user.created_at = datetime.fromisoformat(current_user.created_at)
+        except ValueError:
+            current_user.created_at = None  # fallback if format not valid
+
+    return render_template('auth/profile.html', user=current_user)
+
+@main_bp.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile"""
+    form = ProfileForm(
+        original_username=current_user.username,
+        original_email=current_user.email
+    )
+    
+    if form.validate_on_submit():
+        from models.user import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE users 
+                SET username = ?, email = ? 
+                WHERE id = ?
+            ''', (form.username.data, form.email.data, current_user.id))
+            
+            conn.commit()
+            flash('Profile updated successfully!', 'success')
+            return redirect(url_for('main.profile'))
+            
+        except sqlite3.IntegrityError:
+            flash('Update failed. Username or email may already be taken.', 'error')
+        finally:
+            conn.close()
+    
+    if request.method == 'GET':
+        form.username.data = current_user.username
+        form.email.data = current_user.email
+    
+    return render_template('auth/edit_profile.html', form=form)
+
+@main_bp.route('/profile/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    """Change user password"""
+    form = ChangePasswordForm()
+    
+    if form.validate_on_submit():
+        if current_user.check_password(form.current_password.data):
+            from app.models.user import get_db_connection
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            new_password_hash = generate_password_hash(form.new_password.data)
+            cursor.execute('''
+                UPDATE users 
+                SET password_hash = ? 
+                WHERE id = ?
+            ''', (new_password_hash, current_user.id))
+            
+            conn.commit()
+            conn.close()
+            
+            flash('Password changed successfully!', 'success')
+            return redirect(url_for('main.profile'))
+        else:
+            flash('Current password is incorrect', 'error')
+    
+    return render_template('auth/change_password.html', form=form)
+
+@main_bp.route('/admin/users')
+@role_required('admin')
+def admin_users():
+    """Admin page to manage users"""
+    users = User.get_all_users()
+    return render_template('auth/admin_users.html', users=users)
+
+@main_bp.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@role_required('admin')
+def admin_edit_user(user_id):
+    """Admin edit user"""
+    user = User.get_by_id(user_id)
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('main.admin_users'))
+    
+    form = AdminUserForm()
+    
+    if form.validate_on_submit():
+        from app.models.user import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('''
+                UPDATE users 
+                SET username = ?, email = ?, role = ? 
+                WHERE id = ?
+            ''', (form.username.data, form.email.data, form.role.data, user_id))
+            
+            conn.commit()
+            flash(f'User {form.username.data} updated successfully!', 'success')
+            logger.info(f"Admin {current_user.username} updated user {user.username}")
+            return redirect(url_for('main.admin_users'))
+            
+        except sqlite3.IntegrityError:
+            flash('Update failed. Username or email may already be taken.', 'error')
+        finally:
+            conn.close()
+    
+    # Pre-populate form
+    if request.method == 'GET':
+        form.username.data = user.username
+        form.email.data = user.email
+        form.role.data = user.role
+    
+    return render_template('auth/admin_edit_user.html', form=form, user=user)
+
+@main_bp.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@login_required
+def admin_delete_user(user_id):
+    """Admin delete user"""
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'}), 403
+    
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
+    
+    user = User.get_by_id(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    from app.models.user import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True, 'message': 'User deleted successfully'})
+
+
 # Function to check if file extension is allowed
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+
 # Add this route to your routes.py file
 @main_bp.route('/upload-company-data', methods=['POST'])
 def upload_company_data():
+    logger.info(f"User {current_user.username} ({current_user.role}) uploading data")
     # Check if the post request has the file part
     if 'company-data-file' not in request.files:
         return jsonify({'success': False, 'message': 'No file part in the request.'}), 400
@@ -942,6 +1173,7 @@ def calculate_correlations():
         }
 
 @main_bp.route('/')
+@login_required
 def index():
     # Get the list of available indicators
     macro_df = load_macro_data()
@@ -957,10 +1189,17 @@ def index():
     
     logger.info(f"Rendering index with {len(macro_indicators)} macro indicators and {len(company_metrics)} company metrics")
     logger.info(f"Company metrics: {company_metrics}")
+    logger.info(f"User {current_user.username} logged in with role: {current_user.role}")
     
     return render_template('index.html', 
                           macro_indicators=macro_indicators,
-                          company_metrics=company_metrics)
+                          company_metrics=company_metrics,
+                          user=current_user)
+
+# Protect upload route for analysts only
+#@main_bp.route('/upload-company-data', methods=['POST'])
+#@login_required('analyst')
+
 @main_bp.route('/macro-data/<indicator>')
 def get_macro_data(indicator):
     """Get raw chart data for a macro indicator"""
@@ -1415,7 +1654,7 @@ import os
 import json
 
 # Set your Groq API key
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')  # Replace with your actual key
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')  # Replace with your actual key
 
 def call_groq_api(query, context, context_data):
     """Call Groq API with the financial data context"""
@@ -1484,56 +1723,7 @@ Always be specific and data-driven rather than generic.
     except Exception as e:
         logger.exception(f"Error calling Groq API: {e}")
         return generate_enhanced_local_response(query, context_data)
-def format_context_for_mistral(context, context_data):
-    """Format context data for the Mistral prompt"""
-    formatted_parts = []
-    
-    # Add current view information
-    formatted_parts.append(f"CURRENT VIEW: {context.get('current_view', 'Unknown')}")
-    
-    # Add indicator data if available
-    if 'indicator' in context_data:
-        ind = context_data['indicator']
-        formatted_parts.append(f"\nMACROECONOMIC INDICATOR: {ind['name']}")
-        formatted_parts.append(f"Current value: {ind['current_value']:.2f}")
-        formatted_parts.append(f"Historical range: {ind['historical_min']:.2f} to {ind['historical_max']:.2f}")
-        formatted_parts.append(f"Predicted for 2025-2026: {ind['predicted_start']:.2f} to {ind['predicted_end']:.2f}")
-        formatted_parts.append(f"Predicted change: {ind['predicted_change_pct']:.2f}%")
-    
-    # Add metric data if available
-    if 'metric' in context_data:
-        metric = context_data['metric']
-        formatted_parts.append(f"\nCOMPANY METRIC: {metric['name']}")
-        formatted_parts.append(f"Current value: {metric['current_value']:.2f}")
-        formatted_parts.append(f"Historical range: {metric['historical_min']:.2f} to {metric['historical_max']:.2f}")
-        formatted_parts.append(f"Predicted for 2025-2026: {metric['predicted_start']:.2f} to {metric['predicted_end']:.2f}")
-        formatted_parts.append(f"Predicted change: {metric['predicted_change_pct']:.2f}%")
-    
-    # Add correlation data if available
-    if 'correlation' in context_data:
-        corr = context_data['correlation']
-        formatted_parts.append(f"\nCORRELATION ANALYSIS:")
-        formatted_parts.append(f"Correlation between {corr['indicator']} and {corr['metric']}: {corr['correlation']:.2f}")
-        formatted_parts.append(f"This is a {corr['strength']} {corr['direction']} correlation")
-        
-        if corr['direction'] == 'positive':
-            formatted_parts.append(f"When {corr['indicator']} increases, {corr['metric']} tends to increase")
-        else:
-            formatted_parts.append(f"When {corr['indicator']} increases, {corr['metric']} tends to decrease")
-    
-    # Add model performance data if available
-    if 'model_performance' in context_data:
-        perf = context_data['model_performance']
-        formatted_parts.append(f"\nMODEL PERFORMANCE:")
-        formatted_parts.append(f"R² Score (accuracy): {perf['r2']:.3f}")
-        formatted_parts.append(f"Error Rate (MAPE): {perf['mape']:.2f}%")
-        
-        if 'top_features' in perf and perf['top_features']:
-            formatted_parts.append("Top influencing factors:")
-            for idx, feature in enumerate(perf['top_features'][:3]):
-                formatted_parts.append(f"{idx+1}. {feature['feature']}: {feature['importance']*100:.1f}%")
-    
-    return "\n".join(formatted_parts)
+
 
 @main_bp.route('/api/chat', methods=['POST'])
 def chat():
@@ -1642,207 +1832,7 @@ def test_groq_api():
             'success': False,
             'error': str(e)
         })
-def generate_simple_response(query, context):
-    """Generate a simple response based on the query and context"""
-    query_lower = query.lower()
-    
-    # Get context variables
-    current_view = context.get('current_view')
-    current_indicator = context.get('current_indicator')
-    current_metric = context.get('current_metric')
-    
-    # Create a basic response based on what's being viewed
-    if current_view == 'macro-tab' and current_indicator:
-        return f"You're viewing the {current_indicator} macroeconomic indicator. I can explain trends and correlations for this indicator."
-    
-    elif current_view == 'company-tab' and current_metric:
-        return f"You're viewing your company's {current_metric}. I can help explain what factors influence this metric."
-    
-    elif 'trend' in query_lower or 'increase' in query_lower or 'decrease' in query_lower:
-        if current_indicator:
-            return f"The {current_indicator} shows a trend based on historical data and our predictions for 2025-2026."
-        elif current_metric:
-            return f"Your {current_metric} shows a trend based on historical data and our predictions for 2025-2026."
-        else:
-            return "I can analyze trends in the data when you select a specific indicator or metric."
-    
-    elif 'correlation' in query_lower or 'relationship' in query_lower or 'impact' in query_lower:
-        if current_indicator and current_metric:
-            return f"There is a relationship between {current_indicator} and {current_metric} that our model has identified."
-        else:
-            return "I can explain correlations between economic indicators and your company metrics when you have both selected."
-    
-    # Default response
-    return "I can help explain the data in this dashboard. Please ask about specific indicators, metrics, trends, or relationships you'd like to understand."
 
-# Helper function to retrieve relevant data
-def retrieve_relevant_data(query, context):
-    """Retrieve data relevant to the user query with enhanced context awareness"""
-    logger.info(f"Retrieving data for query: {query}")
-    logger.info(f"With context: {context}")
-    
-    # Initialize data object
-    retrieved_data = {
-        'query': query,
-        'context': context,
-        'macro_indicator': None,
-        'company_metric': None,
-        'correlation_data': None,
-        'model_performance': None,
-        'prediction_summary': None,
-        'visualization_context': {},
-        'sources': []
-    }
-    
-    # Extract entities from query
-    entities = extract_entities(query)
-    logger.info(f"Extracted entities: {entities}")
-    
-    # Get current view context
-    current_view = context.get('current_view')
-    current_indicator = context.get('current_indicator')
-    current_metric = context.get('current_metric')
-    
-    # Add visualization context
-    if current_view == 'macro-tab' and current_indicator:
-        # Get the chart data for the currently displayed indicator
-        indicator_data = get_macro_data(current_indicator)
-        if indicator_data:
-            retrieved_data['visualization_context']['chart_type'] = 'line chart'
-            retrieved_data['visualization_context']['displayed_data'] = current_indicator
-            retrieved_data['visualization_context']['has_predictions'] = True
-            
-            # Determine if there's a clear trend
-            values = indicator_data.get('values', [])
-            if values:
-                if len(values) > 5:  # Need enough points to establish a trend
-                    # Simplified trend detection
-                    start = values[0]
-                    end = values[-1]
-                    if end > start * 1.05:  # 5% increase
-                        retrieved_data['visualization_context']['trend'] = 'increasing'
-                    elif end < start * 0.95:  # 5% decrease
-                        retrieved_data['visualization_context']['trend'] = 'decreasing'
-                    else:
-                        retrieved_data['visualization_context']['trend'] = 'stable'
-    
-    elif current_view == 'company-tab' and current_metric:
-        # Get the chart data for the currently displayed metric
-        metric_data = get_company_data(current_metric)
-        if metric_data:
-            retrieved_data['visualization_context']['chart_type'] = 'line chart'
-            retrieved_data['visualization_context']['displayed_data'] = current_metric
-            retrieved_data['visualization_context']['has_predictions'] = True
-            
-            # Get model performance data if available
-            performance = get_model_performance_data(current_metric)
-            if performance:
-                retrieved_data['visualization_context']['model_accuracy'] = performance.get('r2', 0)
-                # Get the top influencing factor
-                top_features = performance.get('top_features', [])
-                if top_features:
-                    retrieved_data['visualization_context']['top_factor'] = top_features[0].get('feature')
-    
-    # Process context data
-    if current_view == 'macro-tab' and current_indicator:
-        # Get data for the displayed indicator
-        retrieved_data['macro_indicator'] = get_macro_indicator_data(current_indicator)
-        retrieved_data['sources'].append(f"Current macro indicator: {current_indicator}")
-        
-        # Check if query asks about impact on company metrics
-        if any(term in query.lower() for term in ['impact', 'effect', 'affect', 'influence', 'company']):
-            # Get correlations with all company metrics
-            company_metrics = get_all_company_metrics()
-            correlations = []
-            for metric in company_metrics:
-                corr = get_correlation_data(current_indicator, metric)
-                if corr:
-                    correlations.append(corr)
-            if correlations:
-                retrieved_data['correlation_data'] = correlations
-                retrieved_data['sources'].append(f"Impact of {current_indicator} on company metrics")
-    
-    elif current_view == 'company-tab' and current_metric:
-        # Get data for the displayed metric
-        retrieved_data['company_metric'] = get_company_metric_data(current_metric)
-        retrieved_data['sources'].append(f"Current company metric: {current_metric}")
-        
-        # Always get model performance data for the current metric
-        retrieved_data['model_performance'] = get_model_performance_data(current_metric)
-        
-        # Get key factors (correlations) influencing this metric
-        retrieved_data['correlation_data'] = get_all_correlations_for_metric(current_metric)
-        retrieved_data['sources'].append(f"Factors influencing {current_metric}")
-        
-        # Get prediction summary
-        retrieved_data['prediction_summary'] = get_prediction_summary(current_metric)
-        
-    # If specific entities are mentioned in the query, prioritize those
-    if entities.get('macro_indicators') or entities.get('company_metrics'):
-        # Handle specific correlation questions
-        if entities.get('macro_indicators') and entities.get('company_metrics'):
-            correlations = []
-            for indicator in entities['macro_indicators']:
-                for metric in entities['company_metrics']:
-                    corr = get_correlation_data(indicator, metric)
-                    if corr:
-                        correlations.append(corr)
-            if correlations:
-                retrieved_data['correlation_data'] = correlations
-                retrieved_data['sources'].append("Specific correlations mentioned in query")
-        
-        # Handle queries about specific company metrics
-        elif entities.get('company_metrics'):
-            for metric in entities['company_metrics']:
-                if not retrieved_data.get('company_metric'):
-                    retrieved_data['company_metric'] = get_company_metric_data(metric)
-                if not retrieved_data.get('model_performance'):
-                    retrieved_data['model_performance'] = get_model_performance_data(metric)
-                if not retrieved_data.get('prediction_summary'):
-                    retrieved_data['prediction_summary'] = get_prediction_summary(metric)
-                if not retrieved_data.get('correlation_data'):
-                    retrieved_data['correlation_data'] = get_all_correlations_for_metric(metric)
-        
-        # Handle queries about specific macro indicators
-        elif entities.get('macro_indicators'):
-            for indicator in entities['macro_indicators']:
-                if not retrieved_data.get('macro_indicator'):
-                    retrieved_data['macro_indicator'] = get_macro_indicator_data(indicator)
-    
-    # Handle specific question types
-    query_lower = query.lower()
-    
-    # Questions about trends
-    if any(term in query_lower for term in ['trend', 'increase', 'decrease', 'growth', 'decline']):
-        if current_metric:
-            trend_data = analyze_trend_data(current_metric)
-            retrieved_data['trend_analysis'] = trend_data
-            retrieved_data['sources'].append(f"Trend analysis for {current_metric}")
-        elif current_indicator:
-            trend_data = analyze_trend_data(current_indicator, is_macro=True)
-            retrieved_data['trend_analysis'] = trend_data
-            retrieved_data['sources'].append(f"Trend analysis for {current_indicator}")
-    
-    # Questions about predictions
-    if any(term in query_lower for term in ['predict', 'forecast', 'future', '2025', '2026']):
-        if current_metric and not retrieved_data.get('prediction_summary'):
-            retrieved_data['prediction_summary'] = get_prediction_summary(current_metric)
-            retrieved_data['sources'].append(f"Prediction for {current_metric}")
-        
-        # Add confidence information based on model performance
-        if retrieved_data.get('model_performance'):
-            r2 = retrieved_data['model_performance'].get('r2', 0)
-            if r2 > 0.8:
-                retrieved_data['prediction_confidence'] = 'high'
-            elif r2 > 0.6:
-                retrieved_data['prediction_confidence'] = 'good'
-            elif r2 > 0.4:
-                retrieved_data['prediction_confidence'] = 'moderate'
-            else:
-                retrieved_data['prediction_confidence'] = 'limited'
-    
-    logger.info(f"Retrieved data sources: {retrieved_data['sources']}")
-    return retrieved_data
 
 def analyze_trend_data(data_name, is_macro=False):
     """Analyze trend data for a metric or indicator"""

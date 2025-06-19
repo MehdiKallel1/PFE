@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit User - Financial Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div class="header-left">
+                <h1>Edit User Account</h1>
+                <p>Modify user information and permissions</p>
+            </div>
+            <div class="header-right">
+                <a href="{{ url_for('main.admin_users') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to User Management
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="admin-edit-container">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">
+                            <i class="fas fa-{% if category == 'error' %}exclamation-triangle{% elif category == 'success' %}check-circle{% else %}info-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="edit-user-card">
+            <!-- User Header -->
+            <div class="user-header">
+                <div class="user-avatar-large">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-header-info">
+                    <h2>{{ user.username }}</h2>
+                    <div class="user-badges">
+                        <span class="role-badge role-{{ user.role }}">
+                            <i class="fas fa-{% if user.role == 'admin' %}user-shield{% elif user.role == 'analyst' %}chart-line{% else %}eye{% endif %}"></i>
+                            {{ user.role.title() }}
+                        </span>
+                        {% if user.id == current_user.id %}
+                        <span class="current-user-badge">Current User</span>
+                        {% endif %}
+                    </div>
+                    <div class="user-metadata">
+                        <span><i class="fas fa-envelope"></i> {{ user.email }}</span>
+                        {% if user.created_at %}
+                        <span><i class="fas fa-calendar-alt"></i> 
+                            {% if user.created_at.__class__.__name__ == 'datetime' %}
+                                Member since {{ user.created_at.strftime('%B %d, %Y') }}
+                            {% else %}
+                                Member since {{ user.created_at }}
+                            {% endif %}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Form -->
+            <div class="edit-form-section">
+                <h3><i class="fas fa-edit"></i> Edit User Information</h3>
+                
+                <form method="POST" class="admin-edit-form">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            {{ form.username.label(class="form-label") }}
+                            <div class="input-group">
+                                <span class="input-icon">
+                                    <i class="fas fa-user"></i>
+                                </span>
+                                {{ form.username(class="form-input" + (" error" if form.username.errors else "")) }}
+                            </div>
+                            {% if form.username.errors %}
+                                <div class="form-errors">
+                                    {% for error in form.username.errors %}
+                                        <span class="error-text">
+                                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-help">Username must be unique (3-20 characters)</small>
+                        </div>
+
+                        <div class="form-group">
+                            {{ form.email.label(class="form-label") }}
+                            <div class="input-group">
+                                <span class="input-icon">
+                                    <i class="fas fa-envelope"></i>
+                                </span>
+                                {{ form.email(class="form-input" + (" error" if form.email.errors else "")) }}
+                            </div>
+                            {% if form.email.errors %}
+                                <div class="form-errors">
+                                    {% for error in form.email.errors %}
+                                        <span class="error-text">
+                                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <small class="form-help">Email address must be valid and unique</small>
+                        </div>
+
+                        <div class="form-group form-group-full">
+                            {{ form.role.label(class="form-label") }}
+                            <div class="role-selector">
+                                {% for value, label in form.role.choices %}
+                                <div class="role-option" onclick="selectRole('{{ value }}')">
+                                    <input type="radio" name="role" value="{{ value }}" id="role_{{ value }}" 
+                                           {% if form.role.data == value %}checked{% endif %}>
+                                    <label for="role_{{ value }}" class="role-card role-{{ value }}">
+                                        <div class="role-icon">
+                                            <i class="fas fa-{% if value == 'admin' %}user-shield{% elif value == 'analyst' %}chart-line{% else %}eye{% endif %}"></i>
+                                        </div>
+                                        <div class="role-info">
+                                            <strong>{{ value.title() }}</strong>
+                                            <small>
+                                                {% if value == 'admin' %}
+                                                    Full system access and user management
+                                                {% elif value == 'analyst' %}
+                                                    Upload data and view model performance
+                                                {% else %}
+                                                    View dashboards and charts only
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.role.errors %}
+                                <div class="form-errors">
+                                    {% for error in form.role.errors %}
+                                        <span class="error-text">
+                                            <i class="fas fa-exclamation-circle"></i> {{ error }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('main.admin_users') }}" class="btn btn-secondary">Cancel</a>
+                        {% if user.id != current_user.id %}
+                        <button type="button" class="btn btn-danger" onclick="confirmResetPassword()">
+                            <i class="fas fa-key"></i> Reset Password
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+
+            <!-- User Permissions Preview -->
+            <div class="permissions-preview">
+                <h3><i class="fas fa-shield-alt"></i> Current Permissions</h3>
+                <div class="permissions-grid" id="permissionsGrid">
+                    <!-- Will be populated by JavaScript based on selected role -->
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            {% if user.id != current_user.id %}
+            <div class="danger-zone">
+                <h3><i class="fas fa-exclamation-triangle"></i> Danger Zone</h3>
+                <div class="danger-actions">
+                    <div class="danger-action">
+                        <div class="danger-info">
+                            <strong>Reset User Password</strong>
+                            <small>Generate a new temporary password for this user</small>
+                        </div>
+                        <button class="btn btn-warning" onclick="confirmResetPassword()">
+                            <i class="fas fa-key"></i> Reset Password
+                        </button>
+                    </div>
+                    <div class="danger-action">
+                        <div class="danger-info">
+                            <strong>Delete User Account</strong>
+                            <small>Permanently delete this user and all associated data</small>
+                        </div>
+                        <button class="btn btn-danger" onclick="confirmDeleteUser()">
+                            <i class="fas fa-trash"></i> Delete User
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-key"></i> Reset Password</h3>
+                <span class="close" onclick="closeResetPasswordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Generate a new temporary password for <strong>{{ user.username }}</strong>?</p>
+                <p>The user will need to use this new password to log in and should change it immediately.</p>
+                <div class="new-password-display" id="newPasswordDisplay" style="display: none;">
+                    <label>New temporary password:</label>
+                    <div class="password-box">
+                        <span id="generatedPassword"></span>
+                        <button type="button" onclick="copyPassword()" class="copy-btn">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <small>Copy this password and share it securely with the user.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Cancel</button>
+                <button class="btn btn-warning" onclick="resetUserPassword()" id="resetPasswordBtn">
+                    <i class="fas fa-key"></i> Generate New Password
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete User Modal -->
+    <div id="deleteUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Delete User</h3>
+                <span class="close" onclick="closeDeleteUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete <strong>{{ user.username }}</strong>?</p>
+                <p>This action will:</p>
+                <ul>
+                    <li>Remove the user account and login credentials</li>
+                    <li>Delete all user data and preferences</li>
+                    <li>Remove any uploaded files or configurations</li>
+                </ul>
+                <p><strong>This action cannot be undone!</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+                <button class="btn btn-danger" onclick="deleteCurrentUser()" id="deleteUserBtn">
+                    <i class="fas fa-trash"></i> Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Role selection and permissions preview
+        function selectRole(role) {
+            document.getElementById('role_' + role).checked = true;
+            updatePermissionsPreview(role);
+        }
+
+        function updatePermissionsPreview(role) {
+            const permissionsGrid = document.getElementById('permissionsGrid');
+            
+            const permissions = {
+                'viewer': [
+                    { icon: 'eye', text: 'View Dashboards', granted: true },
+                    { icon: 'upload', text: 'Upload Data', granted: false },
+                    { icon: 'chart-line', text: 'View Model Performance', granted: false },
+                    { icon: 'users-cog', text: 'Manage Users', granted: false },
+                    { icon: 'cog', text: 'System Administration', granted: false }
+                ],
+                'analyst': [
+                    { icon: 'eye', text: 'View Dashboards', granted: true },
+                    { icon: 'upload', text: 'Upload Data', granted: true },
+                    { icon: 'chart-line', text: 'View Model Performance', granted: true },
+                    { icon: 'users-cog', text: 'Manage Users', granted: false },
+                    { icon: 'cog', text: 'System Administration', granted: false }
+                ],
+                'admin': [
+                    { icon: 'eye', text: 'View Dashboards', granted: true },
+                    { icon: 'upload', text: 'Upload Data', granted: true },
+                    { icon: 'chart-line', text: 'View Model Performance', granted: true },
+                    { icon: 'users-cog', text: 'Manage Users', granted: true },
+                    { icon: 'cog', text: 'System Administration', granted: true }
+                ]
+            };
+
+            permissionsGrid.innerHTML = permissions[role].map(perm => `
+                <div class="permission-item ${perm.granted ? 'granted' : 'denied'}">
+                    <i class="fas fa-${perm.icon}"></i>
+                    <span>${perm.text}</span>
+                    <i class="fas fa-${perm.granted ? 'check' : 'times'} status-icon"></i>
+                </div>
+            `).join('');
+        }
+
+        // Password reset functionality
+        function confirmResetPassword() {
+            document.getElementById('resetPasswordModal').style.display = 'block';
+        }
+
+        function closeResetPasswordModal() {
+            document.getElementById('resetPasswordModal').style.display = 'none';
+            document.getElementById('newPasswordDisplay').style.display = 'none';
+            document.getElementById('resetPasswordBtn').style.display = 'inline-flex';
+        }
+
+        function resetUserPassword() {
+            const btn = document.getElementById('resetPasswordBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+            // Generate a random password
+            const newPassword = generatePassword();
+            
+            // Simulate API call (replace with actual implementation)
+            setTimeout(() => {
+                document.getElementById('generatedPassword').textContent = newPassword;
+                document.getElementById('newPasswordDisplay').style.display = 'block';
+                btn.style.display = 'none';
+                
+                // In a real implementation, you would:
+                // 1. Make API call to reset password
+                // 2. Hash the new password
+                // 3. Update database
+                // 4. Send notification to user
+                
+                showFlashMessage('Password reset successfully! Share the new password securely with the user.', 'success');
+            }, 1000);
+        }
+
+        function generatePassword() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+            let password = '';
+            for (let i = 0; i < 12; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return password;
+        }
+
+        function copyPassword() {
+            const passwordText = document.getElementById('generatedPassword').textContent;
+            navigator.clipboard.writeText(passwordText).then(() => {
+                showFlashMessage('Password copied to clipboard!', 'success');
+            });
+        }
+
+        // Delete user functionality
+        function confirmDeleteUser() {
+            document.getElementById('deleteUserModal').style.display = 'block';
+        }
+
+        function closeDeleteUserModal() {
+            document.getElementById('deleteUserModal').style.display = 'none';
+        }
+
+        function deleteCurrentUser() {
+            const btn = document.getElementById('deleteUserBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
+
+            // Make delete request
+            fetch(`/admin/users/{{ user.id }}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showFlashMessage('User deleted successfully!', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/admin/users';
+                    }, 1000);
+                } else {
+                    showFlashMessage(data.message || 'Error deleting user', 'error');
+                    closeDeleteUserModal();
+                }
+            })
+            .catch(error => {
+                showFlashMessage('Error deleting user', 'error');
+                closeDeleteUserModal();
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-trash"></i> Delete User';
+            });
+        }
+
+        // Utility functions
+        function showFlashMessage(message, category) {
+            const flashContainer = document.querySelector('.flash-messages') || createFlashContainer();
+            const flashMessage = document.createElement('div');
+            flashMessage.className = `flash-message flash-${category}`;
+            flashMessage.innerHTML = `
+                <i class="fas fa-${category === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+                ${message}
+            `;
+            flashContainer.appendChild(flashMessage);
+
+            setTimeout(() => flashMessage.remove(), 5000);
+        }
+
+        function createFlashContainer() {
+            const container = document.createElement('div');
+            container.className = 'flash-messages';
+            document.querySelector('.admin-edit-container').insertBefore(container, document.querySelector('.edit-user-card'));
+            return container;
+        }
+
+        // Initialize permissions preview on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectedRole = document.querySelector('input[name="role"]:checked');
+            if (selectedRole) {
+                updatePermissionsPreview(selectedRole.value);
+            }
+
+            // Add change listeners to role radio buttons
+            document.querySelectorAll('input[name="role"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    updatePermissionsPreview(this.value);
+                });
+            });
+        });
+
+        // Close modals when clicking outside
+        window.onclick = function(event) {
+            const resetModal = document.getElementById('resetPasswordModal');
+            const deleteModal = document.getElementById('deleteUserModal');
+            
+            if (event.target === resetModal) closeResetPasswordModal();
+            if (event.target === deleteModal) closeDeleteUserModal();
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .admin-edit-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .flash-messages {
+            margin-bottom: 2rem;
+        }
+
+        .flash-message {
+            padding: 12px 20px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .flash-error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+
+        .flash-success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+
+        .edit-user-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        /* User Header */
+        .user-header {
+            background: linear-gradient(135deg, #3f51b5, #303f9f);
+            color: white;
+            padding: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .user-avatar-large {
+            font-size: 4rem;
+            opacity: 0.9;
+        }
+
+        .user-header-info h2 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.8rem;
+        }
+
+        .user-badges {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .role-admin {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: #ffcdd2;
+        }
+
+        .role-analyst {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: #c8e6c9;
+        }
+
+        .role-viewer {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: #bbdefb;
+        }
+
+        .current-user-badge {
+            background-color: #4caf50;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .user-metadata {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            opacity: 0.9;
+        }
+
+        .user-metadata span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Edit Form Section */
+        .edit-form-section {
+            padding: 2rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .edit-form-section h3 {
+            margin: 0 0 1.5rem 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group-full {
+            grid-column: 1 / -1;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        .input-group {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 12px;
+            color: #666;
+            z-index: 1;
+            font-size: 0.9rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 12px 12px 40px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #3f51b5;
+            box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.1);
+        }
+
+        .form-input.error {
+            border-color: #c62828;
+        }
+
+        .form-errors {
+            margin-top: 0.5rem;
+        }
+
+        .error-text {
+            color: #c62828;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .form-help {
+            margin-top: 0.25rem;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        /* Role Selector */
+        .role-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .role-option {
+            position: relative;
+        }
+
+        .role-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .role-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .role-card:hover {
+            border-color: #3f51b5;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .role-option input:checked + .role-card {
+            border-color: #3f51b5;
+            background-color: #f3f4ff;
+        }
+
+        .role-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        .role-card.role-admin .role-icon {
+            background-color: #e53935;
+        }
+
+        .role-card.role-analyst .role-icon {
+            background-color: #4caf50;
+        }
+
+        .role-card.role-viewer .role-icon {
+            background-color: #2196f3;
+        }
+
+        .role-info strong {
+            display: block;
+            margin-bottom: 2px;
+            color: #333;
+        }
+
+        .role-info small {
+            color: #666;
+            font-size: 0.8rem;
+        }
+
+        /* Permissions Preview */
+        .permissions-preview {
+            padding: 2rem;
+            background-color: #fafafa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .permissions-preview h3 {
+            margin: 0 0 1.5rem 0;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .permissions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .permission-item.granted {
+            color: #2e7d32;
+            border-color: #4caf50;
+            background-color: #f1f8e9;
+        }
+
+        .permission-item.denied {
+            color: #c62828;
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+
+        .permission-item .status-icon {
+            margin-left: auto;
+        }
+
+        /* Form Actions */
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background-color: #3f51b5;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #303f9f;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background-color: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background-color: #e53935;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #c62828;
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #f57c00;
+            transform: translateY(-2px);
+        }
+
+        /* Danger Zone */
+        .danger-zone {
+            padding: 2rem;
+            background-color: #fff5f5;
+            border-top: 3px solid #e53935;
+        }
+
+        .danger-zone h3 {
+            margin: 0 0 1.5rem 0;
+            color: #c62828;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .danger-actions {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .danger-action {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: white;
+            border: 1px solid #ffcdd2;
+            border-radius: 8px;
+        }
+
+        .danger-info strong {
+            display: block;
+            margin-bottom: 2px;
+            color: #333;
+        }
+
+        .danger-info small {
+            color: #666;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            background-color: #3f51b5;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close {
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+
+        .close:hover {
+            opacity: 1;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        .password-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .copy-btn {
+            background: #3f51b5;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .copy-btn:hover {
+            background: #303f9f;
+        }
+
+        .new-password-display {
+            background-color: #e8f5e8;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #4caf50;
+            margin-top: 1rem;
+        }
+
+        .new-password-display label {
+            font-weight: 600;
+            color: #2e7d32;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .admin-edit-container {
+                margin: 1rem auto;
+            }
+
+            .user-header {
+                flex-direction: column;
+                text-align: center;
+                gap: 1rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .role-selector {
+                grid-template-columns: 1fr;
+            }
+
+            .permissions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .danger-action {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .edit-form-section,
+            .permissions-preview,
+            .danger-zone {
+                padding: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .modal-content {
+                margin: 5% auto;
+                width: 95%;
+            }
+
+            .user-badges {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .user-metadata {
+                align-items: center;
+            }
+        }
+    </style>
+</body>
+</html>

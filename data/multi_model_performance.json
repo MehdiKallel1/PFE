@@ -1664,99 +1664,99 @@
     "future_predictions": [
       {
         "date": "2025-01-31",
-        "predicted_value": 294245668.2911005
+        "predicted_value": 379296004.3876007
       },
       {
         "date": "2025-02-28",
-        "predicted_value": 301037142.3756006
+        "predicted_value": 376470739.32670057
       },
       {
         "date": "2025-03-31",
-        "predicted_value": 306680941.7534005
+        "predicted_value": 366475821.27000064
       },
       {
         "date": "2025-04-30",
-        "predicted_value": 364064315.49340063
+        "predicted_value": 370049313.3779006
       },
       {
         "date": "2025-05-31",
-        "predicted_value": 366307422.7934006
+        "predicted_value": 369318014.0789006
       },
       {
         "date": "2025-06-30",
-        "predicted_value": 296796537.24330056
+        "predicted_value": 364979741.8567006
       },
       {
         "date": "2025-07-31",
-        "predicted_value": 353151027.19110054
+        "predicted_value": 367345787.3856007
       },
       {
         "date": "2025-08-31",
-        "predicted_value": 333196999.1856005
+        "predicted_value": 356987637.51330054
       },
       {
         "date": "2025-09-30",
-        "predicted_value": 324619930.1390006
+        "predicted_value": 353959156.3800006
       },
       {
         "date": "2025-10-31",
-        "predicted_value": 361980345.0601006
+        "predicted_value": 346968294.3867006
       },
       {
         "date": "2025-11-30",
-        "predicted_value": 346964790.2445006
+        "predicted_value": 333721429.0100006
       },
       {
         "date": "2025-12-31",
-        "predicted_value": 305814674.52890056
+        "predicted_value": 341569825.54130054
       },
       {
         "date": "2026-01-31",
-        "predicted_value": 295164835.04220045
+        "predicted_value": 341922489.5201006
       },
       {
         "date": "2026-02-28",
-        "predicted_value": 302924064.2856005
+        "predicted_value": 342263454.1289006
       },
       {
         "date": "2026-03-31",
-        "predicted_value": 347144627.12010056
+        "predicted_value": 340942043.8679006
       },
       {
         "date": "2026-04-30",
-        "predicted_value": 348514984.11230063
+        "predicted_value": 339794679.29570055
       },
       {
         "date": "2026-05-31",
-        "predicted_value": 366724838.89240056
+        "predicted_value": 338425377.3257006
       },
       {
         "date": "2026-06-30",
-        "predicted_value": 343347819.49670064
+        "predicted_value": 345206719.98010063
       },
       {
         "date": "2026-07-31",
-        "predicted_value": 290564000.7711004
+        "predicted_value": 330640595.27650064
       },
       {
         "date": "2026-08-31",
-        "predicted_value": 346541020.9100006
+        "predicted_value": 337701643.9367006
       },
       {
         "date": "2026-09-30",
-        "predicted_value": 291998488.35000044
+        "predicted_value": 344320698.9634006
       },
       {
         "date": "2026-10-31",
-        "predicted_value": 294498481.1733005
+        "predicted_value": 338203954.9511006
       },
       {
         "date": "2026-11-30",
-        "predicted_value": 342886481.1523006
+        "predicted_value": 346794083.2356006
       },
       {
         "date": "2026-12-31",
-        "predicted_value": 287098487.3988005
+        "predicted_value": 347587500.00680053
       }
     ],
     "selection_criteria": {
@@ -3457,99 +3457,99 @@
     "future_predictions": [
       {
         "date": "2025-01-31",
-        "predicted_value": 62381518.53619996
+        "predicted_value": 76626189.47669992
       },
       {
         "date": "2025-02-28",
-        "predicted_value": 63781582.24739998
+        "predicted_value": 75748548.48759991
       },
       {
         "date": "2025-03-31",
-        "predicted_value": 64234889.667299956
+        "predicted_value": 73997986.2197999
       },
       {
         "date": "2025-04-30",
-        "predicted_value": 73554840.79639997
+        "predicted_value": 74436746.47079994
       },
       {
         "date": "2025-05-31",
-        "predicted_value": 73678563.82189995
+        "predicted_value": 74366962.81869993
       },
       {
         "date": "2025-06-30",
-        "predicted_value": 62663806.70409997
+        "predicted_value": 73586618.42419992
       },
       {
         "date": "2025-07-31",
-        "predicted_value": 71143631.85069993
+        "predicted_value": 74023392.19309993
       },
       {
         "date": "2025-08-31",
-        "predicted_value": 68288653.38619995
+        "predicted_value": 72279839.31419997
       },
       {
         "date": "2025-09-30",
-        "predicted_value": 66540671.23159994
+        "predicted_value": 71969803.56079996
       },
       {
         "date": "2025-10-31",
-        "predicted_value": 73251801.27859995
+        "predicted_value": 70866860.05179997
       },
       {
         "date": "2025-11-30",
-        "predicted_value": 69819000.61519995
+        "predicted_value": 67825707.99049994
       },
       {
         "date": "2025-12-31",
-        "predicted_value": 63395431.45719995
+        "predicted_value": 70644225.65059997
       },
       {
         "date": "2026-01-31",
-        "predicted_value": 62105621.90949997
+        "predicted_value": 70783109.56169997
       },
       {
         "date": "2026-02-28",
-        "predicted_value": 63387218.96379995
+        "predicted_value": 70873944.15279995
       },
       {
         "date": "2026-03-31",
-        "predicted_value": 69800453.86059998
+        "predicted_value": 70798959.04499996
       },
       {
         "date": "2026-04-30",
-        "predicted_value": 69915034.39399995
+        "predicted_value": 70312314.00949995
       },
       {
         "date": "2026-05-31",
-        "predicted_value": 74078332.89519994
+        "predicted_value": 70011522.45949996
       },
       {
         "date": "2026-06-30",
-        "predicted_value": 69035610.47949994
+        "predicted_value": 71003705.12959996
       },
       {
         "date": "2026-07-31",
-        "predicted_value": 61214413.40739995
+        "predicted_value": 68289605.94729997
       },
       {
         "date": "2026-08-31",
-        "predicted_value": 69532908.99519995
+        "predicted_value": 69042052.39379993
       },
       {
         "date": "2026-09-30",
-        "predicted_value": 61030741.26149993
+        "predicted_value": 69672560.67719993
       },
       {
         "date": "2026-10-31",
-        "predicted_value": 61284750.45589993
+        "predicted_value": 69111297.64389993
       },
       {
         "date": "2026-11-30",
-        "predicted_value": 68961113.64729995
+        "predicted_value": 69528534.70189995
       },
       {
         "date": "2026-12-31",
-        "predicted_value": 60105142.91159995
+        "predicted_value": 69658330.49529995
       }
     ],
     "selection_criteria": {
@@ -5250,99 +5250,99 @@
     "future_predictions": [
       {
         "date": "2025-01-31",
-        "predicted_value": 57.155784606933594
+        "predicted_value": 63.85480880737305
       },
       {
         "date": "2025-02-28",
-        "predicted_value": 58.86983108520508
+        "predicted_value": 64.18235778808594
       },
       {
         "date": "2025-03-31",
-        "predicted_value": 62.466609954833984
+        "predicted_value": 62.335689544677734
       },
       {
         "date": "2025-04-30",
-        "predicted_value": 59.95717239379883
+        "predicted_value": 64.62696838378906
       },
       {
         "date": "2025-05-31",
-        "predicted_value": 63.36507797241211
+        "predicted_value": 64.46372985839844
       },
       {
         "date": "2025-06-30",
-        "predicted_value": 61.298221588134766
+        "predicted_value": 64.29592895507812
       },
       {
         "date": "2025-07-31",
-        "predicted_value": 61.41713333129883
+        "predicted_value": 64.15840911865234
       },
       {
         "date": "2025-08-31",
-        "predicted_value": 61.272727966308594
+        "predicted_value": 63.85179138183594
       },
       {
         "date": "2025-09-30",
-        "predicted_value": 62.7414436340332
+        "predicted_value": 64.1709976196289
       },
       {
         "date": "2025-10-31",
-        "predicted_value": 66.36764526367188
+        "predicted_value": 58.87761306762695
       },
       {
         "date": "2025-11-30",
-        "predicted_value": 62.79288101196289
+        "predicted_value": 58.898075103759766
       },
       {
         "date": "2025-12-31",
-        "predicted_value": 62.49258804321289
+        "predicted_value": 58.980838775634766
       },
       {
         "date": "2026-01-31",
-        "predicted_value": 64.88021850585938
+        "predicted_value": 56.74463653564453
       },
       {
         "date": "2026-02-28",
-        "predicted_value": 63.44435501098633
+        "predicted_value": 56.557647705078125
       },
       {
         "date": "2026-03-31",
-        "predicted_value": 63.80447006225586
+        "predicted_value": 59.05619812011719
       },
       {
         "date": "2026-04-30",
-        "predicted_value": 62.691505432128906
+        "predicted_value": 59.40890884399414
       },
       {
         "date": "2026-05-31",
-        "predicted_value": 65.79943084716797
+        "predicted_value": 59.40890884399414
       },
       {
         "date": "2026-06-30",
-        "predicted_value": 62.58681869506836
+        "predicted_value": 59.469696044921875
       },
       {
         "date": "2026-07-31",
-        "predicted_value": 65.63381958007812
+        "predicted_value": 59.79984664916992
       },
       {
         "date": "2026-08-31",
-        "predicted_value": 63.11690139770508
+        "predicted_value": 59.40784454345703
       },
       {
         "date": "2026-09-30",
-        "predicted_value": 56.83224868774414
+        "predicted_value": 62.465797424316406
       },
       {
         "date": "2026-10-31",
-        "predicted_value": 62.46670913696289
+        "predicted_value": 56.83952331542969
       },
       {
         "date": "2026-11-30",
-        "predicted_value": 63.15364456176758
+        "predicted_value": 58.90098190307617
       },
       {
         "date": "2026-12-31",
-        "predicted_value": 57.60020446777344
+        "predicted_value": 61.82407760620117
       }
     ],
     "selection_criteria": {
@@ -7043,99 +7043,99 @@
     "future_predictions": [
       {
         "date": "2025-01-31",
-        "predicted_value": 2699.52
+        "predicted_value": 3081.57
       },
       {
         "date": "2025-02-28",
-        "predicted_value": 2756.76
+        "predicted_value": 3049.8
       },
       {
         "date": "2025-03-31",
-        "predicted_value": 2691.87
+        "predicted_value": 3030.27
       },
       {
         "date": "2025-04-30",
-        "predicted_value": 3016.77
+        "predicted_value": 3033.96
       },
       {
         "date": "2025-05-31",
-        "predicted_value": 3039.27
+        "predicted_value": 3029.19
       },
       {
         "date": "2025-06-30",
-        "predicted_value": 2757.48
+        "predicted_value": 3011.1
       },
       {
         "date": "2025-07-31",
-        "predicted_value": 2989.68
+        "predicted_value": 3023.25
       },
       {
         "date": "2025-08-31",
-        "predicted_value": 2882.76
+        "predicted_value": 2981.58
       },
       {
         "date": "2025-09-30",
-        "predicted_value": 2865.12
+        "predicted_value": 2978.79
       },
       {
         "date": "2025-10-31",
-        "predicted_value": 3024.24
+        "predicted_value": 2956.65
       },
       {
         "date": "2025-11-30",
-        "predicted_value": 2967.99
+        "predicted_value": 2848.11
       },
       {
         "date": "2025-12-31",
-        "predicted_value": 2809.68
+        "predicted_value": 2934.51
       },
       {
         "date": "2026-01-31",
-        "predicted_value": 2788.44
+        "predicted_value": 2890.86
       },
       {
         "date": "2026-02-28",
-        "predicted_value": 2765.22
+        "predicted_value": 2938.02
       },
       {
         "date": "2026-03-31",
-        "predicted_value": 2960.7
+        "predicted_value": 2907.24
       },
       {
         "date": "2026-04-30",
-        "predicted_value": 2983.2
+        "predicted_value": 2915.34
       },
       {
         "date": "2026-05-31",
-        "predicted_value": 3027.3
+        "predicted_value": 2897.43
       },
       {
         "date": "2026-06-30",
-        "predicted_value": 2943.33
+        "predicted_value": 2920.47
       },
       {
         "date": "2026-07-31",
-        "predicted_value": 2709.51
+        "predicted_value": 2890.68
       },
       {
         "date": "2026-08-31",
-        "predicted_value": 2954.31
+        "predicted_value": 2931.18
       },
       {
         "date": "2026-09-30",
-        "predicted_value": 2688.72
+        "predicted_value": 2942.88
       },
       {
         "date": "2026-10-31",
-        "predicted_value": 2685.93
+        "predicted_value": 2923.44
       },
       {
         "date": "2026-11-30",
-        "predicted_value": 2928.39
+        "predicted_value": 2943.24
       },
       {
         "date": "2026-12-31",
-        "predicted_value": 2670.36
+        "predicted_value": 2948.01
       }
     ],
     "selection_criteria": {

@@ -1,3 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Financial Dashboard{% endblock %}
+
+{% block page_title %}Financial Dashboard{% endblock %}
+{% block page_subtitle %}Advanced analytics with machine learning predictions and economic forecasting{% endblock %}
+
+{% block content %}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,10 +19,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
-    <header>
-        <h1>Financial Dashboard</h1>
-        <p>Historical data with predictions for 2025-2026</p>
-    </header>
+    
+
 
     <div class="tabs">
         <button class="tab-button active" data-tab="macro-tab">Macroeconomic Indicators</button>
@@ -2190,3 +2197,4 @@ document.addEventListener('DOMContentLoaded', function() {
     </style>
 </body>
 </html>
+{% endblock %}
