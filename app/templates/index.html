@@ -1579,7 +1579,7 @@ function updateDetailedPerformanceViewForModel(modelData) {
         }
 
         // Chat functionality
-        function sendTabMessage() {
+       /* function sendTabMessage() {
             const tabChatInput = document.querySelector('#tab-chat-input');
             if (!tabChatInput) return;
             
@@ -1635,9 +1635,9 @@ function updateDetailedPerformanceViewForModel(modelData) {
                 // Add error message
                 addTabMessageToChat('Sorry, I encountered an error processing your question. Please try again.', 'system');
             });
-        }
+        }*/
 
-        function addTabMessageToChat(message, type) {
+        function addTabMessageToChat(message, type, nlpInsights = null) {
             const tabChatMessages = document.querySelector('#tab-chat-messages');
             if (!tabChatMessages) return null;
             
@@ -1645,14 +1645,72 @@ function updateDetailedPerformanceViewForModel(modelData) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${type}`;
             messageDiv.id = messageId;
-            messageDiv.innerHTML = `<div class="message-content">${message}</div>`;
             
+            let messageContent = `<div class="message-content">${message}</div>`;
+            
+            // Add NLP insights if available
+            if (nlpInsights && nlpInsights.processed) {
+                messageContent += `
+                    <div class="nlp-insights">
+                        <small><strong>AI Analysis:</strong> 
+                        Intent: ${nlpInsights.intent.primary} 
+                        ${nlpInsights.entities.metrics.length > 0 ? `| Metrics: ${nlpInsights.entities.metrics.join(', ')}` : ''}
+                        ${nlpInsights.entities.indicators.length > 0 ? `| Indicators: ${nlpInsights.entities.indicators.join(', ')}` : ''}
+                        </small>
+                    </div>`;
+            }
+            
+            messageDiv.innerHTML = messageContent;
             tabChatMessages.appendChild(messageDiv);
             tabChatMessages.scrollTop = tabChatMessages.scrollHeight;
             
             return messageId;
         }
 
+        // Update the sendTabMessage function to handle NLP insights
+        function sendTabMessage() {
+            const tabChatInput = document.querySelector('#tab-chat-input');
+            if (!tabChatInput) return;
+            
+            const message = tabChatInput.value.trim();
+            if (!message) return;
+            
+            // Add user message
+            addTabMessageToChat(message, 'user');
+            tabChatInput.value = '';
+            
+            // Add thinking message
+            const thinkingId = addTabMessageToChat('Analyzing with AI...', 'thinking');
+            
+            // Get context
+            const context = {
+                current_view: getCurrentTab(),
+                current_indicator: window.currentMacroIndicator || null,
+                current_metric: window.currentCompanyMetric || null
+            };
+            
+            // Send to enhanced endpoint
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: message, context: context })
+            })
+            .then(response => response.json())
+            .then(data => {
+                removeTabMessage(thinkingId);
+                
+                let responseHtml = data.response;
+                if (data.sources && data.sources.length > 0) {
+                    responseHtml += `<div class="chat-sources">Sources: ${data.sources.join(', ')}</div>`;
+                }
+                
+                addTabMessageToChat(responseHtml, 'system', data.nlp_insights);
+            })
+            .catch(error => {
+                removeTabMessage(thinkingId);
+                addTabMessageToChat('Sorry, I encountered an error processing your question.', 'system');
+            });
+        }
         function removeTabMessage(messageId) {
             if (!messageId) return;
             const messageDiv = document.getElementById(messageId);

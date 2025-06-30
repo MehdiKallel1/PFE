@@ -5,7 +5,8 @@ Authentication Forms using Flask-WTF
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, SubmitField, BooleanField
 from wtforms.validators import DataRequired, Email, Length, EqualTo, ValidationError
-from app.models.user import User
+# NEW import in forms.py
+from app.models_new.user_model import User
 
 class LoginForm(FlaskForm):
     """Login form"""

@@ -1,19 +1,25 @@
+# app/__init__.py (Final PostgreSQL Version)
 from flask import Flask
 from flask_login import LoginManager
-import os
 from dotenv import load_dotenv
+import os
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
-def create_app():
+def create_app(config_name='development'):
+    """Application factory pattern"""
     app = Flask(__name__, 
-               template_folder='templates',
-               static_folder='static')
+                template_folder='templates',
+                static_folder='static')
     
-    # Configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or 'your-secret-key-change-this-in-production'
-    app.config['WTF_CSRF_ENABLED'] = True
+    # Load configuration
+    from config import config
+    app.config.from_object(config[config_name])
+    
+    # Initialize database (PostgreSQL)
+    from app.models_new import init_database
+    init_database(app)
     
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -24,15 +30,10 @@ def create_app():
     
     @login_manager.user_loader
     def load_user(user_id):
-        from app.models.user import User
+        from app.models_new.user_model import User
         return User.get_by_id(int(user_id))
     
-    # Initialize database
-    with app.app_context():
-        from app.models.user import init_db
-        init_db()
-    
-    # Import and register blueprints/routes
+    # Register blueprints
     from app.routes import main_bp
     app.register_blueprint(main_bp)
     

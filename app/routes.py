@@ -18,10 +18,14 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import logging
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, logout_user, login_required, current_user
-from app.models.user import User
+from app.models_new.user_model import User
 from forms import LoginForm, RegistrationForm, ChangePasswordForm, ProfileForm, AdminUserForm
 from werkzeug.security import generate_password_hash
 import sqlite3
+from app.models_new import db
+
+
+
 main_bp = Blueprint('main', __name__)
 
 # Set up logging
@@ -44,7 +48,19 @@ except ImportError as e:
     MULTI_MODEL_AVAILABLE = False
     logger.warning(f"Multi-model system not available: {e}")
 
+import requests
+import os
+import json
+import logging
 
+# Add after other imports
+try:
+    from app.nlp import QueryProcessor
+    NLP_AVAILABLE = True
+    print("✅ NLP module loaded successfully")
+except ImportError as e:
+    NLP_AVAILABLE = False
+    print(f"⚠️  NLP module not available: {e}")
 
 # Add these constants near the top of your routes.py file
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'uploads')
@@ -176,31 +192,28 @@ def edit_profile():
 @main_bp.route('/profile/change-password', methods=['GET', 'POST'])
 @login_required
 def change_password():
-    """Change user password"""
+    """Change user password - FIXED to use PostgreSQL only"""
     form = ChangePasswordForm()
     
     if form.validate_on_submit():
         if current_user.check_password(form.current_password.data):
-            from app.models.user import get_db_connection
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            new_password_hash = generate_password_hash(form.new_password.data)
-            cursor.execute('''
-                UPDATE users 
-                SET password_hash = ? 
-                WHERE id = ?
-            ''', (new_password_hash, current_user.id))
-            
-            conn.commit()
-            conn.close()
-            
-            flash('Password changed successfully!', 'success')
-            return redirect(url_for('main.profile'))
+            try:
+                # Update password using PostgreSQL models
+                current_user.set_password(form.new_password.data)
+                db.session.commit()
+                
+                flash('Password changed successfully!', 'success')
+                return redirect(url_for('main.profile'))
+                
+            except Exception as e:
+                db.session.rollback()
+                flash('Error changing password. Please try again.', 'error')
+                logger.error(f"Password change error: {e}")
         else:
             flash('Current password is incorrect', 'error')
     
     return render_template('auth/change_password.html', form=form)
+
 
 @main_bp.route('/admin/users')
 @role_required('admin')
@@ -212,7 +225,7 @@ def admin_users():
 @main_bp.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
 @role_required('admin')
 def admin_edit_user(user_id):
-    """Admin edit user"""
+    """Admin edit user - FIXED to use PostgreSQL only"""
     user = User.get_by_id(user_id)
     if not user:
         flash('User not found', 'error')
@@ -221,26 +234,21 @@ def admin_edit_user(user_id):
     form = AdminUserForm()
     
     if form.validate_on_submit():
-        from app.models.user import get_db_connection
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
         try:
-            cursor.execute('''
-                UPDATE users 
-                SET username = ?, email = ?, role = ? 
-                WHERE id = ?
-            ''', (form.username.data, form.email.data, form.role.data, user_id))
+            # Update using PostgreSQL models
+            user.username = form.username.data
+            user.email = form.email.data
+            user.role = form.role.data
+            db.session.commit()
             
-            conn.commit()
             flash(f'User {form.username.data} updated successfully!', 'success')
             logger.info(f"Admin {current_user.username} updated user {user.username}")
             return redirect(url_for('main.admin_users'))
             
-        except sqlite3.IntegrityError:
+        except Exception as e:
+            db.session.rollback()
             flash('Update failed. Username or email may already be taken.', 'error')
-        finally:
-            conn.close()
+            logger.error(f"Admin user update error: {e}")
     
     # Pre-populate form
     if request.method == 'GET':
@@ -251,12 +259,9 @@ def admin_edit_user(user_id):
     return render_template('auth/admin_edit_user.html', form=form, user=user)
 
 @main_bp.route('/admin/users/<int:user_id>/delete', methods=['POST'])
-@login_required
+@role_required('admin')
 def admin_delete_user(user_id):
-    """Admin delete user"""
-    if not current_user.is_admin():
-        return jsonify({'success': False, 'message': 'Access denied'}), 403
-    
+    """Admin delete user - FIXED to use PostgreSQL only"""
     if user_id == current_user.id:
         return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
     
@@ -264,15 +269,19 @@ def admin_delete_user(user_id):
     if not user:
         return jsonify({'success': False, 'message': 'User not found'}), 404
     
-    from app.models.user import get_db_connection
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'success': True, 'message': 'User deleted successfully'})
+    try:
+        # Delete using PostgreSQL models
+        username = user.username  # Store for logging
+        db.session.delete(user)
+        db.session.commit()
+        
+        logger.info(f"Admin {current_user.username} deleted user {username}")
+        return jsonify({'success': True, 'message': 'User deleted successfully'})
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"User deletion error: {e}")
+        return jsonify({'success': False, 'message': 'Error deleting user'}), 500
 
 
 # Function to check if file extension is allowed
@@ -1654,7 +1663,7 @@ import os
 import json
 
 # Set your Groq API key
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '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')  # Replace with your actual key
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '*')  # Replace with your actual key
 
 def call_groq_api(query, context, context_data):
     """Call Groq API with the financial data context"""
@@ -1727,68 +1736,217 @@ Always be specific and data-driven rather than generic.
 
 @main_bp.route('/api/chat', methods=['POST'])
 def chat():
-    """Handle chatbot queries using Groq API"""
+    """Enhanced chatbot with better error handling"""
     try:
-        # Get query from request
+        print("📨 Chat endpoint called")  # Debug log
+        
         data = request.json
         query = data.get('query', '')
-        
-        logger.info(f"Received chat query: {query}")
         
         if not query:
             return jsonify({'error': 'No query provided'}), 400
         
-        # Get current context (which charts/metrics are being viewed)
+        print(f"🔍 Processing query: {query}")  # Debug log
+        
+        # Get current context
         current_context = data.get('context', {})
-        logger.info(f"Current context: {current_context}")
         
-        # Extract current indicator and metric
-        current_indicator = current_context.get('current_indicator')
-        current_metric = current_context.get('current_metric')
+        # Try NLP Processing with fallback
+        nlp_results = None
+        enhanced_context = current_context
         
-        # Gather relevant data based on context
+        if NLP_AVAILABLE:
+            try:
+                print("🧠 Attempting NLP processing...")
+                nlp_processor = QueryProcessor()
+                nlp_results = nlp_processor.process(query)
+                enhanced_context = nlp_processor.enhance_context(current_context, nlp_results)
+                print("✅ NLP processing successful")
+            except Exception as nlp_error:
+                print(f"⚠️  NLP processing failed: {nlp_error}")
+                nlp_results = None
+        else:
+            print("⚠️  NLP not available, using basic processing")
+        
+        # Gather context data (existing logic)
         context_data = {}
         
-        # Add indicator data if available
-        if current_indicator:
-            indicator_data = get_indicator_data(current_indicator)
-            if indicator_data:
-                context_data['indicator'] = indicator_data
+        try:
+            current_indicator = enhanced_context.get('current_indicator')
+            current_metric = enhanced_context.get('current_metric')
+            
+            if current_indicator:
+                indicator_data = get_indicator_data(current_indicator)
+                if indicator_data:
+                    context_data['indicator'] = indicator_data
+                    
+            if current_metric:
+                metric_data = get_metric_data(current_metric)
+                if metric_data:
+                    context_data['metric'] = metric_data
                 
-        # Add metric data if available
-        if current_metric:
-            metric_data = get_metric_data(current_metric)
-            if metric_data:
-                context_data['metric'] = metric_data
-                
-            # Get model performance data if available
-            perf_data = get_model_performance_data(current_metric)
-            if perf_data:
-                context_data['model_performance'] = perf_data
-                
-        # Get correlation data if both indicator and metric are available
-        if current_indicator and current_metric:
-            corr_data = get_correlation(current_indicator, current_metric)
-            if corr_data:
-                context_data['correlation'] = corr_data
+                perf_data = get_model_performance_data(current_metric)
+                if perf_data:
+                    context_data['model_performance'] = perf_data
+            
+            if current_indicator and current_metric:
+                corr_data = get_correlation(current_indicator, current_metric)
+                if corr_data:
+                    context_data['correlation'] = corr_data
+                    
+            print(f"📊 Context data gathered: {list(context_data.keys())}")
+            
+        except Exception as context_error:
+            print(f"⚠️  Context gathering failed: {context_error}")
+            context_data = {}
         
-        # Generate response using Groq API
-        response = call_groq_api(query, current_context, context_data)
+        # Generate response
+        try:
+            if nlp_results:
+                print("🚀 Using enhanced Groq API call")
+                response = call_groq_api_enhanced(query, enhanced_context, context_data, nlp_results)
+            else:
+                print("🚀 Using standard Groq API call")
+                response = call_groq_api_simple(query, context_data)
+                
+            print("✅ Response generated successfully")
+            
+        except Exception as api_error:
+            print(f"❌ API call failed: {api_error}")
+            response = generate_fallback_response(query, context_data)
         
-        return jsonify({
+        # Return response
+        result = {
             'response': response,
-            'sources': list(context_data.keys())  # Return which data sources were used
-        })
+            'sources': list(context_data.keys())
+        }
+        
+        if nlp_results:
+            result['nlp_insights'] = {
+                'entities': nlp_results.get('entities', {}),
+                'intent': nlp_results.get('intent', {}),
+                'processed': nlp_results.get('processed', False)
+            }
+        
+        print("✅ Chat response ready")
+        return jsonify(result)
         
     except Exception as e:
-        # Log the full exception with traceback
-        logger.exception(f"Error in chat endpoint: {e}")
+        print(f"❌ Critical error in chat endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         
-        # Return a simple error response
         return jsonify({
-            'response': f"I apologize, but I encountered an error processing your question. Error details: {str(e)}",
-            'sources': []
-        })
+            'response': "I apologize, but I'm experiencing technical difficulties. Please try again.",
+            'sources': [],
+            'error': str(e)
+        }), 500
+
+def call_groq_api_simple(query, context_data):
+    """Simplified Groq API call for fallback"""
+    try:
+        context_text = format_context_for_prompt(context_data)
+        
+        prompt = f"""You are a financial analyst assistant.
+
+USER QUERY: {query}
+
+DASHBOARD DATA:
+{context_text}
+
+Provide a clear, helpful response based on the available data."""
+
+        return call_groq_with_prompt(prompt)
+        
+    except Exception as e:
+        print(f"❌ Groq API call failed: {e}")
+        raise e
+
+def generate_fallback_response(query, context_data):
+    """Generate response without external APIs"""
+    if 'metric' in context_data:
+        metric = context_data['metric']
+        return f"I can see you're asking about {metric['name']}. The current value is {metric.get('current_value', 'N/A')} with a predicted change of {metric.get('predicted_change_pct', 0):.2f}% through 2026."
+    
+    if 'indicator' in context_data:
+        indicator = context_data['indicator']
+        return f"Regarding the {indicator['name']} indicator, it currently shows a value of {indicator.get('current_value', 'N/A')} with predicted changes ahead."
+    
+    return "I can help you analyze the financial data in this dashboard. Please select a specific metric or indicator from the charts to get detailed insights."
+def call_groq_api_enhanced(query, context, context_data, nlp_results):
+    """Enhanced Groq API call with NLP context"""
+    try:
+        context_text = format_enhanced_context(context_data, nlp_results)
+        
+        prompt = f"""You are a financial analyst assistant for a dashboard that shows macroeconomic indicators and company metrics with predictions for 2025-2026.
+
+USER QUERY: {query}
+
+NLP ANALYSIS:
+- Detected Intent: {nlp_results['intent']['primary']} (confidence: {nlp_results['intent']['confidence']:.2f})
+- Extracted Entities: {nlp_results['entities']}
+
+CURRENT VIEW: {context.get('current_view', 'Unknown')}
+
+DASHBOARD DATA:
+{context_text}
+
+Provide a clear, detailed answer focusing on the detected intent and extracted entities. Use specific numbers from the data and explain their business implications.
+"""
+        
+        return call_groq_with_prompt(prompt)
+        
+    except Exception as e:
+        logger.error(f"Enhanced Groq API call failed: {e}")
+        return call_groq_api(query, context, context_data)
+
+def format_enhanced_context(context_data, nlp_results):
+    """Format context with NLP insights"""
+    context_parts = []
+    
+    # Add NLP-specific context
+    entities = nlp_results.get('entities', {})
+    if entities.get('metrics'):
+        context_parts.append(f"USER MENTIONED METRICS: {', '.join(entities['metrics'])}")
+    if entities.get('indicators'):
+        context_parts.append(f"USER MENTIONED INDICATORS: {', '.join(entities['indicators'])}")
+    if entities.get('time_periods'):
+        context_parts.append(f"USER MENTIONED TIME PERIODS: {', '.join(entities['time_periods'])}")
+    
+    # Add existing context formatting
+    context_parts.append(format_context_for_prompt(context_data))
+    
+    return "\n".join(context_parts)
+
+def call_groq_with_prompt(prompt):
+    """Helper function to call Groq API with formatted prompt"""
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messages": [{"role": "user", "content": prompt}],
+        "model": "allam-2-7b",
+        "temperature": 0.3,
+        "max_tokens": 1024,
+        "top_p": 1
+    }
+    
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers=headers,
+        json=payload,
+        timeout=30
+    )
+    
+    if response.status_code == 200:
+        result = response.json()
+        if 'choices' in result and len(result['choices']) > 0:
+            return result['choices'][0]['message']['content']
+    
+    raise Exception(f"Groq API error: {response.status_code}")
+
 @main_bp.route('/api/test-groq', methods=['GET'])
 def test_groq_api():
     """Test endpoint for Groq API connectivity"""
@@ -2081,145 +2239,6 @@ def get_prediction_summary(metric):
     except Exception as e:
         logger.exception(f"Error getting prediction summary: {e}")
         return None
-def format_enhanced_context(retrieved_data):
-    """Format retrieved data into a richer context for the prompt"""
-    context_parts = []
-    
-    # Add visualization context
-    viz_context = retrieved_data.get('visualization_context', {})
-    if viz_context:
-        context_parts.append("CURRENT VISUALIZATION:")
-        if 'chart_type' in viz_context:
-            context_parts.append(f"Chart Type: {viz_context['chart_type']}")
-        if 'displayed_data' in viz_context:
-            context_parts.append(f"Currently Displayed: {viz_context['displayed_data']}")
-        if 'trend' in viz_context:
-            context_parts.append(f"Visual Trend: {viz_context['trend']}")
-        if 'has_predictions' in viz_context and viz_context['has_predictions']:
-            context_parts.append(f"Chart includes predicted data for 2025-2026")
-        if 'model_accuracy' in viz_context:
-            context_parts.append(f"Model Accuracy (R²): {viz_context['model_accuracy']:.3f}")
-        if 'top_factor' in viz_context:
-            context_parts.append(f"Top influencing factor: {viz_context['top_factor']}")
-        context_parts.append("")
-    
-    # Add trend analysis if available
-    if retrieved_data.get('trend_analysis'):
-        trend = retrieved_data['trend_analysis']
-        context_parts.append(f"TREND ANALYSIS FOR {trend['name']}:")
-        context_parts.append(f"Historical change: {trend['historical_change_pct']:.2f}%")
-        context_parts.append(f"Predicted change: {trend['predicted_change_pct']:.2f}%")
-        if trend['continues_trend']:
-            context_parts.append(f"The prediction continues the historical trend direction")
-        else:
-            context_parts.append(f"The prediction reverses the historical trend direction")
-        if isinstance(trend['relative_strength'], (int, float)):
-            if trend['relative_strength'] > 1.2:
-                context_parts.append(f"The predicted trend is accelerating (stronger than historical)")
-            elif trend['relative_strength'] < 0.8:
-                context_parts.append(f"The predicted trend is decelerating (weaker than historical)")
-            else:
-                context_parts.append(f"The predicted trend maintains similar momentum to historical")
-        context_parts.append("")
-    
-    # Add current view context with more detail
-    if retrieved_data['context'].get('current_view'):
-        view_names = {
-            'macro-tab': 'Macroeconomic Indicators',
-            'company-tab': 'Company Metrics',
-            'upload-tab': 'Upload Data',
-            'chat-tab': 'Chat Assistant'
-        }
-        view_name = view_names.get(retrieved_data['context'].get('current_view'), 
-                               retrieved_data['context'].get('current_view'))
-        context_parts.append(f"Current dashboard tab: {view_name}")
-    
-    # Add macro indicator data if available with more details
-    if retrieved_data.get('macro_indicator'):
-        ind = retrieved_data['macro_indicator']
-        context_parts.append(f"MACRO INDICATOR: {ind['name']}")
-        context_parts.append(f"Current value: {ind['current_value']:.2f}")
-        context_parts.append(f"Historical range: {ind['historical_min']:.2f} to {ind['historical_max']:.2f}")
-        context_parts.append(f"Predicted value (end of 2026): {ind['end_2026_value']:.2f}")
-        context_parts.append(f"Predicted change (2025-2026): {ind['predicted_change']:.2f}%")
-        context_parts.append("")
-    
-    # Add company metric data if available with more details
-    if retrieved_data.get('company_metric'):
-        metric = retrieved_data['company_metric']
-        context_parts.append(f"COMPANY METRIC: {metric['name']}")
-        context_parts.append(f"Current value: {metric['current_value']:.2f}")
-        context_parts.append(f"Historical range: {metric['historical_min']:.2f} to {metric['historical_max']:.2f}")
-        context_parts.append(f"Predicted value (end of 2026): {metric['end_2026_value']:.2f}")
-        context_parts.append(f"Predicted change (2025-2026): {metric['predicted_change']:.2f}%")
-        context_parts.append("")
-    
-    # Add correlation data with better formatting and explanation
-    if retrieved_data.get('correlation_data'):
-        if isinstance(retrieved_data['correlation_data'], list):
-            context_parts.append("CORRELATIONS:")
-            for corr in retrieved_data['correlation_data']:
-                correlation = corr['correlation']
-                strength = get_correlation_strength(correlation)
-                context_parts.append(f"{corr['indicator']} to {corr['metric']}: {correlation:.2f} ({strength})")
-        else:
-            corr_data = retrieved_data['correlation_data']
-            context_parts.append(f"CORRELATIONS FOR {corr_data['metric']}:")
-            for idx, corr in enumerate(corr_data['correlations'][:5]):  # Top 5 correlations
-                correlation = corr['correlation']
-                strength = get_correlation_strength(correlation)
-                context_parts.append(f"{idx+1}. {corr['indicator']}: {correlation:.2f} ({strength})")
-        context_parts.append("")
-    
-    # Add model performance data with quality assessments
-    if retrieved_data.get('model_performance'):
-        perf = retrieved_data['model_performance']
-        context_parts.append(f"MODEL PERFORMANCE FOR {perf['metric']}:")
-        
-        # R² assessment
-        r2 = perf['r2']
-        r2_quality = "excellent" if r2 > 0.8 else "good" if r2 > 0.6 else "moderate" if r2 > 0.4 else "limited"
-        context_parts.append(f"R² Score: {r2:.3f} ({r2_quality})")
-        
-        # Error assessment
-        mape = perf['mape']
-        error_quality = "very low" if mape < 5 else "low" if mape < 10 else "moderate" if mape < 20 else "high"
-        context_parts.append(f"Error Rate (MAPE): {mape:.2f}% ({error_quality})")
-        
-        # Feature importance with percentages
-        context_parts.append("Top influencing factors:")
-        for feature in perf['top_features']:
-            pct = feature['importance'] * 100
-            context_parts.append(f"- {feature['feature']}: {pct:.1f}%")
-        context_parts.append("")
-    
-    # Add prediction summary with more context
-    if retrieved_data.get('prediction_summary'):
-        pred = retrieved_data['prediction_summary']
-        context_parts.append(f"PREDICTION SUMMARY FOR {pred['metric']}:")
-        context_parts.append(f"Starting value (2025): {pred['start_value']:.2f}")
-        context_parts.append(f"Ending value (2026): {pred['end_value']:.2f}")
-        
-        # Add more descriptive context about the change
-        change = pred['change_percent']
-        if abs(change) < 1:
-            magnitude = "slight"
-        elif abs(change) < 5:
-            magnitude = "modest"
-        elif abs(change) < 10:
-            magnitude = "significant"
-        else:
-            magnitude = "substantial"
-            
-        direction = "increase" if change > 0 else "decrease"
-        context_parts.append(f"Overall change: {change:.2f}% ({magnitude} {direction})")
-        
-        if retrieved_data.get('prediction_confidence'):
-            context_parts.append(f"Prediction confidence: {retrieved_data['prediction_confidence']}")
-        
-        context_parts.append("")
-    
-    return "\n".join(context_parts)
 
 def get_correlation_strength(correlation):
     """Convert a correlation coefficient to a descriptive strength"""
